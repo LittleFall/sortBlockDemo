@@ -67,12 +67,15 @@ struct Comparer {
 
 
 template <typename T>
-auto sortByColumn(std::vector<size_t> & perm, const std::vector<std::pair<int, int>> & queue, const Comparer<T> & comparer) {
+auto sortByColumn(std::vector<size_t> & perm, const std::vector<std::pair<int, int>> & queue, const Comparer<T> & comparer, bool need_queue) {
     for (auto & [begin, end] : queue) {
         std::sort(perm.begin() + begin, perm.begin() + end, comparer);
     }
 
     std::vector<std::pair<int, int>> nq;
+    if (!need_queue) {
+        return nq;
+    }
     for (auto & [begin, end] : queue) {
         // assert(end>begin+1)
         auto nb = -1;
@@ -100,13 +103,17 @@ std::vector<size_t> sortBlock(Block & block) {
 
     std::vector<std::pair<int, int>> queue;
     queue.emplace_back(0, rows);
-    for (auto * col_ptr : block.t) {
+    for (size_t i = 0; i<block.t.size(); ++i) {
+        if (queue.empty()) {
+            break;
+        }
+        const auto & col_ptr = block.t[i];
         if (auto * col_Int = dynamic_cast<ColumnInt *>(col_ptr)) {
-            queue = sortByColumn(perm, queue, Comparer<ColumnInt>{col_Int});
+            queue = sortByColumn(perm, queue, Comparer<ColumnInt>{col_Int}, i < block.t.size()-1);
         } else if (auto * col_String = dynamic_cast<ColumnString *>(col_ptr)) {
-            queue = sortByColumn(perm, queue, Comparer<ColumnString>{col_String});
+            queue = sortByColumn(perm, queue, Comparer<ColumnString>{col_String}, i < block.t.size()-1);
         } else if (auto * col_Double = dynamic_cast<ColumnDouble *>(col_ptr)) {
-            queue = sortByColumn(perm, queue, Comparer<ColumnDouble>{col_Double});
+            queue = sortByColumn(perm, queue, Comparer<ColumnDouble>{col_Double}, i < block.t.size()-1);
         }  // ... xmacro
     }
 
