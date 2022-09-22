@@ -1,4 +1,3 @@
-#include <stack>
 #include <queue>
 #include <iostream>
 #include <numeric>
@@ -52,19 +51,15 @@ struct Block {
     std::vector<IColumn *> t;
 };
 
+template <typename T>
+struct Comparer {
+    T * column;
 
-struct Cmp {
-    Block & block;
+    explicit Comparer(IColumn * column) : column(static_cast<T *>(column)) {}
 
-    explicit Cmp(Block & block) : block(block) {}
-
-    bool operator() (size_t a, size_t b) {
-        int res = 0;
-        for (auto * col_ptr : block.t) {
-            res = col_ptr->compareAt(a, b);
-            if (res) { break; }
-        }
-        return res<0;
+    inline bool operator() (size_t a, size_t b)
+    {
+        return column->compareAt(a, b);
     }
 };
 
@@ -74,7 +69,16 @@ std::vector<size_t> sortBlock(Block & block) {
     std::vector<size_t> perm(rows);
     std::iota(perm.begin(), perm.end(), 0);
 
-    std::sort(perm.begin(), perm.end(), Cmp(block));
+    using It = std::vector<size_t>::iterator;
+
+    for (auto col_ptr_it = block.t.rbegin(); col_ptr_it != block.t.rend(); ++col_ptr_it) {
+        std::sort(perm.begin(), perm.end(), Comparer<ColumnInt>(*col_ptr_it));
+    }
+//    auto dfs = [&](It begin, It end, size_t column_id) {
+////        std::sort(begin, end, column_id);
+//
+//    };
+
 
     return perm;
 }
