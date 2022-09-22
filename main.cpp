@@ -59,7 +59,38 @@ struct Comparer {
     {
         return column->compareAt(a, b) < 0;
     }
+    inline bool equal(size_t a, size_t b) const
+    {
+        return column->compareAt(a, b) == 0;
+    }
 };
+
+
+template <typename T>
+auto sortByColumn(std::vector<size_t> & perm, const std::vector<std::pair<int, int>> & queue, const Comparer<T> & comparer) {
+    for (auto & [begin, end] : queue) {
+        std::sort(perm.begin() + begin, perm.begin() + end, comparer);
+    }
+
+    std::vector<std::pair<int, int>> nq;
+    for (auto & [begin, end] : queue) {
+        // assert(end>begin+1)
+        auto nb = -1;
+        for (auto id = begin; id < end - 1; ++id) {
+            if (comparer.equal(perm[id], perm[id+1])) {
+                if (nb == -1) {
+                    nb = id;
+                }
+            } else {
+                if (nb != -1) {
+                    nq.emplace_back(nb, id+1);
+                    nb = -1;
+                }
+            }
+        }
+    }
+    return nq;
+}
 
 std::vector<size_t> sortBlock(Block & block) {
     auto rows = block.t[0]->len();
@@ -67,27 +98,17 @@ std::vector<size_t> sortBlock(Block & block) {
     std::vector<size_t> perm(rows);
     std::iota(perm.begin(), perm.end(), 0);
 
-    for (auto col_ptr_it = block.t.rbegin(); col_ptr_it != block.t.rend(); ++col_ptr_it) {
-        if (auto * col_Int = dynamic_cast<ColumnInt *>(*col_ptr_it)) {
-            std::stable_sort(perm.begin(), perm.end(), Comparer<ColumnInt>{col_Int});
-        } else if (auto * col_String = dynamic_cast<ColumnString *>(*col_ptr_it)) {
-            std::stable_sort(perm.begin(), perm.end(), Comparer<ColumnString>{col_String});
-        } else if (auto * col_Double = dynamic_cast<ColumnDouble *>(*col_ptr_it)) {
-            std::stable_sort(perm.begin(), perm.end(), Comparer<ColumnDouble>{col_Double});
-        }
-        /*
-        else if (auto * col_##TYPE = dynamic_cast<Column##TYPE *>(*col_ptr_it)) {
-            std::sort(perm.begin(), perm.end(), Comparer<Column##TYPE>{col_##TYPE});
-        }
-        */
+    std::vector<std::pair<int, int>> queue;
+    queue.emplace_back(0, rows);
+    for (auto * col_ptr : block.t) {
+        if (auto * col_Int = dynamic_cast<ColumnInt *>(col_ptr)) {
+            queue = sortByColumn(perm, queue, Comparer<ColumnInt>{col_Int});
+        } else if (auto * col_String = dynamic_cast<ColumnString *>(col_ptr)) {
+            queue = sortByColumn(perm, queue, Comparer<ColumnString>{col_String});
+        } else if (auto * col_Double = dynamic_cast<ColumnDouble *>(col_ptr)) {
+            queue = sortByColumn(perm, queue, Comparer<ColumnDouble>{col_Double});
+        }  // ... xmacro
     }
-
-//    std::queue<std::pair<size_t, size_t>> que;
-//    que.emplace(0, rows);
-//    for (auto * col_ptr : block.t) {
-//
-//    }
-
 
     return perm;
 }
