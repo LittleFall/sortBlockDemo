@@ -55,11 +55,9 @@ template <typename T>
 struct Comparer {
     T * column;
 
-    explicit Comparer(IColumn * column) : column(static_cast<T *>(column)) {}
-
     inline bool operator() (size_t a, size_t b)
     {
-        return column->compareAt(a, b);
+        return column->compareAt(a, b) < 0;
     }
 };
 
@@ -69,15 +67,26 @@ std::vector<size_t> sortBlock(Block & block) {
     std::vector<size_t> perm(rows);
     std::iota(perm.begin(), perm.end(), 0);
 
-    using It = std::vector<size_t>::iterator;
-
     for (auto col_ptr_it = block.t.rbegin(); col_ptr_it != block.t.rend(); ++col_ptr_it) {
-        std::sort(perm.begin(), perm.end(), Comparer<ColumnInt>(*col_ptr_it));
+        if (auto * col_Int = dynamic_cast<ColumnInt *>(*col_ptr_it)) {
+            std::stable_sort(perm.begin(), perm.end(), Comparer<ColumnInt>{col_Int});
+        } else if (auto * col_String = dynamic_cast<ColumnString *>(*col_ptr_it)) {
+            std::stable_sort(perm.begin(), perm.end(), Comparer<ColumnString>{col_String});
+        } else if (auto * col_Double = dynamic_cast<ColumnDouble *>(*col_ptr_it)) {
+            std::stable_sort(perm.begin(), perm.end(), Comparer<ColumnDouble>{col_Double});
+        }
+        /*
+        else if (auto * col_##TYPE = dynamic_cast<Column##TYPE *>(*col_ptr_it)) {
+            std::sort(perm.begin(), perm.end(), Comparer<Column##TYPE>{col_##TYPE});
+        }
+        */
     }
-//    auto dfs = [&](It begin, It end, size_t column_id) {
-////        std::sort(begin, end, column_id);
+
+//    std::queue<std::pair<size_t, size_t>> que;
+//    que.emplace(0, rows);
+//    for (auto * col_ptr : block.t) {
 //
-//    };
+//    }
 
 
     return perm;
